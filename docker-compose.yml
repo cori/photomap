@@ -1,0 +1,24 @@
+services:
+  photomap:
+    # Swap `build: .` for the published image if you'd rather not build:
+    #   image: ghcr.io/cori/photomap:latest
+    build: .
+    image: ghcr.io/cori/photomap:latest
+    container_name: photomap
+    restart: unless-stopped
+    ports:
+      - "${PHOTOMAP_PORT:-8787}:8787"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Only holds the reverse-geocode cache. Safe to delete; safe to omit.
+      - photomap-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  photomap-data:
