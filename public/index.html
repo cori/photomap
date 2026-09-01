@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>photomap — map an iCloud shared album</title>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <h1>photomap</h1>
+    </div>
+
+    <form class="loader" id="loader" autocomplete="off">
+      <input class="loader__input" id="album-input" type="text" spellcheck="false"
+             placeholder="Paste an iCloud shared album link, image URLs, or drop photos here">
+      <button class="btn btn--primary" type="submit">Add</button>
+    </form>
+
+    <div class="topbar__right">
+      <span class="status" id="status" role="status"></span>
+      <button class="btn btn--ghost" id="pick-files" type="button" title="Choose photos from this device">Files…</button>
+      <input type="file" id="file-input" accept="image/*" multiple hidden>
+    </div>
+  </header>
+
+  <main class="main">
+    <aside class="sidebar" id="sidebar">
+      <section class="panel" id="albums-panel">
+        <h2 class="panel__title">Sources</h2>
+        <div class="albums" id="albums"></div>
+        <p class="empty" id="albums-empty">
+          Nothing loaded yet.
+          <button class="link" id="try-sample" type="button">Try the sample album</button>
+        </p>
+      </section>
+
+      <section class="panel" id="stats-panel" hidden>
+        <h2 class="panel__title">Coverage</h2>
+        <div class="stats" id="stats"></div>
+        <div class="progress" id="progress" hidden><span></span></div>
+      </section>
+
+      <section class="panel" id="time-panel" hidden>
+        <h2 class="panel__title">When</h2>
+        <div class="range">
+          <input type="range" id="range-from" min="0" max="1000" value="0">
+          <input type="range" id="range-to" min="0" max="1000" value="1000">
+        </div>
+        <p class="range__label" id="range-label"></p>
+        <button class="link" id="range-reset" type="button">Reset</button>
+      </section>
+
+      <section class="panel panel--grow" id="inview-panel" hidden>
+        <h2 class="panel__title">In view <span class="panel__count" id="inview-count"></span></h2>
+        <div class="thumbgrid" id="inview"></div>
+      </section>
+
+      <section class="panel" id="unlocated-panel" hidden>
+        <h2 class="panel__title">No location <span class="panel__count" id="unlocated-count"></span></h2>
+        <div class="thumbgrid thumbgrid--muted" id="unlocated"></div>
+      </section>
+    </aside>
+
+    <div class="mapwrap">
+      <div id="map" class="map"></div>
+
+      <div class="map-controls">
+        <div class="segmented" id="basemaps" role="group" aria-label="Base map"></div>
+        <label class="toggle"><input type="checkbox" id="route-toggle" checked> Route</label>
+        <button class="btn btn--ghost" id="fit-all" type="button">Fit all</button>
+        <button class="btn btn--ghost" id="sidebar-toggle" type="button" title="Hide panel">Panel</button>
+      </div>
+
+      <div class="hint" id="hint" hidden></div>
+    </div>
+  </main>
+
+  <div class="lightbox" id="lightbox" hidden></div>
+  <div class="dropzone" id="dropzone" hidden><div>Drop photos to map them</div></div>
+</div>
+
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
