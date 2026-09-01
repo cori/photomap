@@ -42,11 +42,30 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Keyed on the branch itself, not {{is_default_branch}}: the repo's
+          # default-branch pointer is a setting that can disagree with where
+          # releases actually come from, and when it does these tags vanish
+          # silently and anything pinning them breaks.
           tags: |
-            type=raw,value=${{ steps.pkg.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=${{ steps.pkg.outputs.version }},enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
+
+      # This exact tag is what the runtipi app store pins, so a build that
+      # quietly drops it is worse than a build that fails.
+      - name: Check the version tag will be applied
+        if: github.ref == 'refs/heads/main'
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          EXPECTED: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pkg.outputs.version }}
+        run: |
+          if ! grep -Fxq "$EXPECTED" <<< "$TAGS"; then
+            echo "::error::expected $EXPECTED among the tags to publish, got:"
+            echo "$TAGS"
+            exit 1
+          fi
+          echo "ok — publishing $EXPECTED"
 
       - name: Build and push
         uses: docker/build-push-action@v6
