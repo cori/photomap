@@ -42,7 +42,13 @@ cut a new one.
 | `TZ` | `UTC` | Container timezone. |
 | `HTTPS_PROXY` | unset | Outbound proxy, tunnelled with `CONNECT`. |
 
-`GET /healthz` returns `{ok:true}` and is what the image's `HEALTHCHECK` polls.
+`GET /healthz` is what the image's `HEALTHCHECK` polls. It reports liveness
+plus how much the server has cached since it started — `albums` is resolved
+album partitions, `places` is reverse-geocoded coordinates:
+
+```json
+{ "ok": true, "albums": 0, "places": 0 }
+```
 
 The only writable state is that geocode cache, which exists so a restart
 doesn't re-ask Nominatim about places it already knows. Delete it freely —
