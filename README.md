@@ -8,18 +8,48 @@ No build step, no framework, no dependencies — vanilla ES modules, Leaflet
 
 ## Run it
 
+With Docker:
+
 ```sh
-node server.js          # or: npm start
+docker compose up -d
 open http://127.0.0.1:8787
 ```
 
-Node 18+. Nothing to install.
+Or straight from source (Node 18+, nothing to install):
 
-Paste a shared album link and press **Add**:
+```sh
+node server.js          # or: npm start
+```
+
+Then paste a shared album link and press **Add**:
 
 ```
 https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57
 ```
+
+Published images are at `ghcr.io/cori/photomap` — `latest`, plus a pinned
+`sha-<commit>` tag per build, for `linux/amd64` and `linux/arm64`.
+
+### Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8787` | Listen port. |
+| `HOST` | `127.0.0.1` (`0.0.0.0` in the image) | Bind address. |
+| `CACHE_DIR` | unset (`/data` in the image) | Where to persist the reverse-geocode cache. Unset keeps it in memory only. |
+| `TZ` | `UTC` | Container timezone. |
+| `HTTPS_PROXY` | unset | Outbound proxy, tunnelled with `CONNECT`. |
+
+`GET /healthz` returns `{ok:true}` and is what the image's `HEALTHCHECK` polls.
+
+The only writable state is that geocode cache, which exists so a restart
+doesn't re-ask Nominatim about places it already knows. Delete it freely —
+everything the app actually shows lives in your browser.
+
+### runtipi
+
+Packaged in [cori/rtappstore](https://github.com/cori/rtappstore) as
+`photomap`. Add that app store to runtipi and install it from there.
 
 ## What you can feed it
 

@@ -29,6 +29,9 @@ const { URL } = require('url');
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
+// Optional writable directory. Only used to persist the geocode cache so a
+// restart doesn't re-ask Nominatim for places it already knows.
+const CACHE_DIR = process.env.CACHE_DIR || '';
 const USER_AGENT = 'photomap/1.0 (self-hosted photo map; https://github.com/)';
 
 // ---------------------------------------------------------------------------
@@ -236,6 +239,32 @@ const geocodeCache = new Map();
 let geocodeChain = Promise.resolve();
 let lastGeocodeAt = 0;
 
+const geocodeCacheFile = CACHE_DIR ? path.join(CACHE_DIR, 'geocode-cache.json') : '';
+if (geocodeCacheFile) {
+  try {
+    for (const [key, value] of Object.entries(JSON.parse(fs.readFileSync(geocodeCacheFile, 'utf8')))) {
+      geocodeCache.set(key, value);
+    }
+    console.log(`[photomap] loaded ${geocodeCache.size} cached places from ${geocodeCacheFile}`);
+  } catch {
+    // No cache yet, or it's unreadable — we'll write a fresh one.
+  }
+}
+
+let cacheWriteTimer = null;
+function persistGeocodeCache() {
+  if (!geocodeCacheFile || cacheWriteTimer) return;
+  cacheWriteTimer = setTimeout(async () => {
+    cacheWriteTimer = null;
+    try {
+      await fs.promises.mkdir(CACHE_DIR, { recursive: true });
+      await fs.promises.writeFile(geocodeCacheFile, JSON.stringify(Object.fromEntries(geocodeCache)));
+    } catch (err) {
+      console.warn('[photomap] could not write geocode cache:', err.message);
+    }
+  }, 5000);
+}
+
 function reverseGeocode(lat, lon) {
   const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
   if (geocodeCache.has(key)) return Promise.resolve(geocodeCache.get(key));
@@ -265,6 +294,7 @@ function reverseGeocode(lat, lon) {
       place = null;
     }
     geocodeCache.set(key, place);
+    persistGeocodeCache();
     return place;
   }).catch(() => null);
 
@@ -400,6 +430,7 @@ async function handleImage(req, res, url) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
+    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, albums: partitionCache.size, places: geocodeCache.size });
     if (url.pathname === '/api/album') return await handleAlbum(req, res, url);
     if (url.pathname === '/api/geocode') return await handleGeocode(req, res, url);
     if (url.pathname === '/api/image') return await handleImage(req, res, url);
@@ -415,4 +446,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`photomap running at http://${HOST}:${PORT}`);
   if (AGENT) console.log('[photomap] using HTTPS_PROXY for outbound requests');
+  if (CACHE_DIR) console.log(`[photomap] geocode cache: ${geocodeCacheFile}`);
 });
