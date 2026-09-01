@@ -27,8 +27,10 @@ Then paste a shared album link and press **Add**:
 https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57
 ```
 
-Published images are at `ghcr.io/cori/photomap` — `latest`, plus a pinned
-`sha-<commit>` tag per build, for `linux/amd64` and `linux/arm64`.
+Published images are at `ghcr.io/cori/photomap` for `linux/amd64` and
+`linux/arm64`, tagged with the `package.json` version (`1.0.0`), the commit
+(`sha-<short>`), and `latest`. Pin the version tag — bump `package.json` to
+cut a new one.
 
 ### Configuration
 
