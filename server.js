@@ -98,10 +98,13 @@ function fetchRaw(urlStr, { method = 'GET', headers = {}, body = null, timeout =
 function parseAlbumToken(input) {
   const raw = String(input || '').trim();
   if (!raw) return null;
-  // https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57  (also /sharedalbum/B0n... and ?#...)
-  const m = raw.match(/icloud\.com\/sharedalbum\/?(?:[a-z]{2}-[a-z]{2}\/)?#?([A-Za-z0-9]+)/i);
+  // Tokens come in two shapes: the short old style (B0n5Uzl7V3IW57) and a much
+  // longer newer one that is base64url, so `-` and `_` are part of the token
+  // and stopping at them silently yields a prefix that 404s.
+  // https://www.icloud.com/sharedalbum/#TOKEN  (also /sharedalbum/TOKEN and /en-us/#TOKEN)
+  const m = raw.match(/icloud\.com\/sharedalbum\/?(?:[a-z]{2}-[a-z]{2}\/)?#?([A-Za-z0-9_-]+)/i);
   if (m) return m[1];
-  if (/^#?[A-Za-z0-9]{8,}$/.test(raw)) return raw.replace(/^#/, '');
+  if (/^#?[A-Za-z0-9_-]{8,}$/.test(raw)) return raw.replace(/^#/, '');
   return null;
 }
 

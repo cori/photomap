@@ -179,7 +179,8 @@ function syncUrl() {
 }
 
 function restoreFromUrl() {
-  const match = location.hash.match(/album=([A-Za-z0-9,]+)/);
+  // Tokens may contain - and _ (newer base64url album tokens).
+  const match = location.hash.match(/album=([A-Za-z0-9,_-]+)/);
   const tokens = match ? match[1].split(',').filter(Boolean) : [];
   const missing = tokens.filter((t) => !state.albums.has(t));
   if (missing.length) {
