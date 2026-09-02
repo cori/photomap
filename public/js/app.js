@@ -6,17 +6,25 @@ import { state, on, emit, emitNow, counts, dateRange, locatedPhotos, allFiltered
 import { loadSharedAlbum, loadFiles, loadImageUrls, parseAlbumInput, isImageUrl } from './sources.js';
 import { initMap, mapView, render, fitAll, focusPhoto, setBasemap, basemapNames, setRouteVisible, closeSpider } from './mapview.js';
 import { initLightbox, open as openLightbox, isOpen as lightboxOpen } from './lightbox.js';
+import { encodeView, decodeView, copyText } from './share.js';
 
 const SAMPLE = 'https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57';
 
 const el = (id) => document.getElementById(id);
 const dom = {};
 let fitScheduled = null;
+// While restoring, the map moves and filters change before the albums exist.
+// Writing the URL from that half-built state would erase the very link we're
+// reading, so hold the writes until the restore finishes.
+let restoring = false;
 
 function boot() {
   cacheDom();
   initMap(dom.map);
-  initLightbox(dom.lightbox, { onShowOnMap: () => {} });
+  initLightbox(dom.lightbox, {
+    onShowOnMap: () => {},
+    onShare: (photo) => share(photo.guid),
+  });
   buildBasemapControl();
   wireEvents();
 
@@ -51,6 +59,7 @@ function cacheDom() {
   dom.input = el('album-input');
   dom.dropzone = el('dropzone');
   dom.hint = el('hint');
+  dom.share = el('share');
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +83,11 @@ function wireEvents() {
   });
 
   el('route-toggle').addEventListener('change', (e) => setRouteVisible(e.target.checked));
+  dom.share.addEventListener('click', () => share(null));
+
+  // The address bar tracks the view, so copying it is as good as Share.
+  mapView.map.on('moveend zoomend', syncUrl);
+  on('filters', syncUrl);
 
   el('pick-files').addEventListener('click', () => el('file-input').click());
   el('file-input').addEventListener('change', (e) => {
@@ -169,31 +183,142 @@ function showHint(message) {
 }
 
 // ---------------------------------------------------------------------------
-// Shareable URL (#album=TOKEN,TOKEN)
+// Shareable URL — see share.js for the fragment format
 // ---------------------------------------------------------------------------
 
+/** Album tokens only — local files and pasted URLs can't travel in a link. */
+function shareableTokens() {
+  return [...state.albums.keys()].filter((t) => t !== 'local' && t !== 'links');
+}
+
+/** The current view, as the thing share.js serialises. */
+function currentView({ photo = null } = {}) {
+  const albums = shareableTokens();
+  const center = mapView.map ? mapView.map.getCenter() : null;
+  const visible = albums.filter((t) => state.filters.albums.has(t));
+  return {
+    albums,
+    center: center ? { lat: center.lat, lng: center.lng } : null,
+    zoom: mapView.map ? mapView.map.getZoom() : null,
+    basemap: mapView.basemap,
+    photo,
+    dates: { from: state.filters.from, to: state.filters.to },
+    visible,
+  };
+}
+
+/**
+ * Keep the address bar shareable at all times, so copying from it is as good
+ * as pressing Share. replaceState rather than pushState: panning a map should
+ * not fill up the back button, and it doesn't fire hashchange, so this can't
+ * loop back into restoreFromUrl.
+ */
 function syncUrl() {
-  const tokens = [...state.albums.keys()].filter((t) => t !== 'local' && t !== 'links');
-  const hash = tokens.length ? `#album=${tokens.join(',')}` : '';
+  if (restoring) return;
+  if (!shareableTokens().length) {
+    if (location.hash) history.replaceState(null, '', location.pathname);
+    return;
+  }
+  const hash = encodeView(currentView());
   if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname);
 }
 
-function restoreFromUrl() {
-  // Tokens may contain - and _ (newer base64url album tokens).
-  const match = location.hash.match(/album=([A-Za-z0-9,_-]+)/);
-  const tokens = match ? match[1].split(',').filter(Boolean) : [];
-  const missing = tokens.filter((t) => !state.albums.has(t));
-  if (missing.length) {
-    addFromText(missing.join(' '));
+/** The link the Share button hands out. */
+export function shareUrl({ photo = null } = {}) {
+  return `${location.origin}${location.pathname}${encodeView(currentView({ photo }))}`;
+}
+
+async function share(photo) {
+  const url = shareUrl({ photo });
+  if (!shareableTokens().length) {
+    showHint('Load a shared album first — local files can’t travel in a link.');
     return;
   }
-  if (!state.albums.size) {
+  const ok = await copyText(url);
+  showHint(ok ? 'Link copied — it opens this exact view.' : url);
+}
+
+async function restoreFromUrl() {
+  const view = decodeView(location.hash);
+  restoring = true;
+  try {
+    await restoreView(view);
+  } finally {
+    restoring = false;
+    syncUrl();
+  }
+}
+
+async function restoreView(view) {
+
+  // Apply the map view first: it doesn't depend on photos, and setting it now
+  // stops the auto-fit from stealing the framing the link asked for.
+  applyView(view);
+
+  const missing = view.albums.filter((t) => !state.albums.has(t));
+  if (missing.length) {
+    await addFromText(missing.join(' '));
+    applyView(view);          // albums finished loading; re-assert framing
+    if (view.photo) openPhotoByGuid(view.photo);
+    return;
+  }
+
+  if (view.photo) openPhotoByGuid(view.photo);
+
+  if (!view.albums.length && !state.albums.size) {
     const remembered = rememberedAlbums();
     if (remembered.length) {
       dom.input.value = `https://www.icloud.com/sharedalbum/#${remembered[0]}`;
       showHint('Last album is in the box — press Add to reload it.');
     }
   }
+}
+
+function applyView(view) {
+  if (view.basemap) {
+    setBasemap(view.basemap);
+    document.querySelectorAll('[data-basemap]').forEach((b) =>
+      b.classList.toggle('is-active', b.dataset.basemap === view.basemap));
+  }
+
+  if (view.dates) {
+    state.filters.from = view.dates.from;
+    state.filters.to = view.dates.to;
+    emitNow('filters');
+  }
+
+  if (view.visible && view.visible.length) {
+    for (const token of state.albums.keys()) {
+      if (token === 'local' || token === 'links') continue;
+      if (view.visible.includes(token)) state.filters.albums.add(token);
+      else state.filters.albums.delete(token);
+    }
+    emitNow('filters');
+    renderAlbums();
+  }
+
+  if (view.center && Number.isFinite(view.zoom)) {
+    // Counts as the viewer choosing a view, so streaming photos don't refit.
+    mapView.userInteracted = true;
+    mapView.map.setView([view.center.lat, view.center.lng], view.zoom, { animate: false });
+  }
+  render();
+}
+
+/**
+ * Links carry a photo GUID rather than the internal id, so it stays stable
+ * and readable. The photo exists as soon as the album JSON lands, well before
+ * its EXIF does — the viewer fills the location in when it arrives.
+ */
+function openPhotoByGuid(guid) {
+  for (const photo of state.photos.values()) {
+    if (photo.guid === guid) {
+      openLightbox(photo.id);
+      return true;
+    }
+  }
+  showHint('That photo isn’t in the loaded album any more.');
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +381,24 @@ function renderTimeRange() {
   if (dom.timePanel.hidden) return;
   dom.timePanel.dataset.min = range.min;
   dom.timePanel.dataset.max = range.max;
+  syncRangeInputs();
   updateRangeLabel();
+}
+
+/**
+ * Move the sliders to match the active filter. Needed when a link arrives with
+ * a date range: the filter is set before any photo (and so any date span)
+ * exists, so the thumbs can only be placed once the span is known.
+ */
+function syncRangeInputs() {
+  if (document.activeElement === dom.rangeFrom || document.activeElement === dom.rangeTo) return;
+  const min = Number(dom.timePanel.dataset.min);
+  const max = Number(dom.timePanel.dataset.max);
+  const span = max - min;
+  if (!span) return;
+  const pos = (t) => Math.min(1000, Math.max(0, Math.round(((t - min) / span) * 1000)));
+  dom.rangeFrom.value = state.filters.from ? pos(state.filters.from) : 0;
+  dom.rangeTo.value = state.filters.to ? pos(state.filters.to) : 1000;
 }
 
 function onRangeInput() {
@@ -350,6 +492,7 @@ function buildBasemapControl() {
     if (!btn) return;
     setBasemap(btn.dataset.basemap);
     container.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b === btn));
+    syncUrl();
   });
 }
 
