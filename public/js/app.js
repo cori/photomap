@@ -289,8 +289,11 @@ function applyView(view) {
   // place, showing them a different map from the one that was shared.
   const basemap = view.basemap || DEFAULT_BASEMAP;
   if (basemap !== mapView.basemap) setBasemap(basemap);
+  // Read the key back rather than reusing the requested one: setBasemap falls
+  // back for an unknown b=, and highlighting the requested value would leave
+  // no button lit at all.
   document.querySelectorAll('[data-basemap]').forEach((b) =>
-    b.classList.toggle('is-active', b.dataset.basemap === basemap));
+    b.classList.toggle('is-active', b.dataset.basemap === mapView.basemap));
 
   if (view.dates) {
     state.filters.from = view.dates.from;
@@ -298,7 +301,9 @@ function applyView(view) {
     emitNow('filters');
   }
 
-  if (view.visible && view.visible.length) {
+  // Array, not truthy-length: [] means "untick everything", and skipping it
+  // left the recipient with filters the link didn't ask for.
+  if (Array.isArray(view.visible)) {
     for (const token of state.albums.keys()) {
       if (token === 'local' || token === 'links') continue;
       if (view.visible.includes(token)) state.filters.albums.add(token);

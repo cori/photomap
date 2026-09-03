@@ -82,7 +82,12 @@ export function encodeView(view) {
     const to = view.dates.to ? toDate(view.dates.to) : '';
     parts.push(`t=${from},${to}`);
   }
-  if (view.visible && view.albums && view.visible.length && view.visible.length !== view.albums.length) {
+  // An empty f= is meaningful — it says "none ticked", which is a state the
+  // viewer can actually be in. Testing view.visible.length here instead of
+  // comparing against the album count made that state unrepresentable, so the
+  // link came back with everything ticked. The decoder already tells the two
+  // apart: absent f= is null, empty f= is [].
+  if (view.visible && view.albums && view.albums.length && view.visible.length !== view.albums.length) {
     parts.push(`f=${encodeList(view.visible)}`);
   }
   return parts.length ? `#${parts.join('&')}` : '';
