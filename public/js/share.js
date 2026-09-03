@@ -15,6 +15,19 @@
 
 const KEYS = ['album', 'c', 'z', 'b', 'p', 't', 'f'];
 
+/**
+ * Values safe to drop into a fragment unescaped. iCloud photo GUIDs and album
+ * tokens qualify; the synthetic ids we give local files ("IMG 1.jpg:12345")
+ * and pasted URLs (the URL itself) do not — those carry spaces, `?` and `&`,
+ * which would split the fragment into junk.
+ */
+const LINK_SAFE = /^[A-Za-z0-9_-]+$/;
+
+/** Can this photo be named in a link at all? */
+export function isLinkablePhoto(guid) {
+  return typeof guid === 'string' && LINK_SAFE.test(guid);
+}
+
 /** Album tokens are base64url, so only `,` needs protecting as a separator. */
 function encodeList(values) {
   return values.join(',');
@@ -47,12 +60,16 @@ function fromDate(text, endOfDay) {
 export function encodeView(view) {
   const parts = [];
   if (view.albums && view.albums.length) parts.push(`album=${encodeList(view.albums)}`);
-  if (view.center && Number.isFinite(view.center.lat)) {
+  // Both halves, or neither: a half-checked pair threw on the missing one,
+  // and this runs on every map move, so a throw here stops the URL updating.
+  if (view.center && Number.isFinite(view.center.lat) && Number.isFinite(view.center.lng)) {
     parts.push(`c=${view.center.lat.toFixed(5)},${view.center.lng.toFixed(5)}`);
   }
   if (Number.isFinite(view.zoom)) parts.push(`z=${Math.round(view.zoom)}`);
   if (view.basemap && view.basemap !== 'light') parts.push(`b=${view.basemap}`);
-  if (view.photo) parts.push(`p=${view.photo}`);
+  // Guard here rather than only at the call site: nothing that reaches this
+  // function should be able to produce a fragment that won't parse back.
+  if (isLinkablePhoto(view.photo)) parts.push(`p=${view.photo}`);
   if (view.dates && (view.dates.from || view.dates.to)) {
     const from = view.dates.from ? toDate(view.dates.from) : '';
     const to = view.dates.to ? toDate(view.dates.to) : '';
@@ -82,7 +99,7 @@ export function decodeView(hash) {
     if (KEYS.includes(key)) params.set(key, chunk.slice(eq + 1));
   }
 
-  view.albums = decodeList(params.get('album')).filter((t) => /^[A-Za-z0-9_-]+$/.test(t));
+  view.albums = decodeList(params.get('album')).filter(isLinkablePhoto);
 
   const center = decodeList(params.get('c')).map(Number);
   if (center.length === 2 && Number.isFinite(center[0]) && Number.isFinite(center[1]) &&
@@ -97,7 +114,7 @@ export function decodeView(hash) {
   if (basemap && /^[a-z]+$/.test(basemap)) view.basemap = basemap;
 
   const photo = params.get('p');
-  if (photo && /^[A-Za-z0-9_-]+$/.test(photo)) view.photo = photo;
+  if (isLinkablePhoto(photo)) view.photo = photo;
 
   if (params.has('t')) {
     const [from, to] = String(params.get('t')).split(',');
@@ -105,7 +122,7 @@ export function decodeView(hash) {
     if (dates.from || dates.to) view.dates = dates;
   }
 
-  if (params.has('f')) view.visible = decodeList(params.get('f')).filter((t) => /^[A-Za-z0-9_-]+$/.test(t));
+  if (params.has('f')) view.visible = decodeList(params.get('f')).filter(isLinkablePhoto);
 
   return view;
 }

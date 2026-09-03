@@ -6,7 +6,7 @@ import { state, on, emit, emitNow, counts, dateRange, locatedPhotos, allFiltered
 import { loadSharedAlbum, loadFiles, loadImageUrls, parseAlbumInput, isImageUrl } from './sources.js';
 import { initMap, mapView, render, fitAll, focusPhoto, setBasemap, basemapNames, setRouteVisible, closeSpider } from './mapview.js';
 import { initLightbox, open as openLightbox, isOpen as lightboxOpen } from './lightbox.js';
-import { encodeView, decodeView, copyText } from './share.js';
+import { encodeView, decodeView, copyText, isLinkablePhoto } from './share.js';
 
 const SAMPLE = 'https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57';
 
@@ -229,13 +229,22 @@ export function shareUrl({ photo = null } = {}) {
 }
 
 async function share(photo) {
-  const url = shareUrl({ photo });
   if (!shareableTokens().length) {
     showHint('Load a shared album first — local files can’t travel in a link.');
     return;
   }
-  const ok = await copyText(url);
-  showHint(ok ? 'Link copied — it opens this exact view.' : url);
+  // A local file or pasted URL has no linkable id, so the link can only carry
+  // the view. Say so rather than handing over a link that quietly drops the
+  // photo the button was pressed on.
+  const droppedPhoto = photo && !isLinkablePhoto(photo);
+  const ok = await copyText(shareUrl({ photo }));
+  if (!ok) {
+    showHint(shareUrl({ photo }));
+    return;
+  }
+  showHint(droppedPhoto
+    ? 'Link copied to this view — this photo isn’t from a shared album, so it can’t be linked directly.'
+    : 'Link copied — it opens this exact view.');
 }
 
 async function restoreFromUrl() {
