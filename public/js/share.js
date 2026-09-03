@@ -23,6 +23,13 @@ const KEYS = ['album', 'c', 'z', 'b', 'p', 't', 'f'];
  */
 const LINK_SAFE = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * The basemap a link means when it carries no `b=`. Omitting the default keeps
+ * links short, but that only works if both ends agree what the default is —
+ * so the format owns it, and the map takes its initial value from here.
+ */
+export const DEFAULT_BASEMAP = 'light';
+
 /** Can this photo be named in a link at all? */
 export function isLinkablePhoto(guid) {
   return typeof guid === 'string' && LINK_SAFE.test(guid);
@@ -66,7 +73,7 @@ export function encodeView(view) {
     parts.push(`c=${view.center.lat.toFixed(5)},${view.center.lng.toFixed(5)}`);
   }
   if (Number.isFinite(view.zoom)) parts.push(`z=${Math.round(view.zoom)}`);
-  if (view.basemap && view.basemap !== 'light') parts.push(`b=${view.basemap}`);
+  if (view.basemap && view.basemap !== DEFAULT_BASEMAP) parts.push(`b=${view.basemap}`);
   // Guard here rather than only at the call site: nothing that reaches this
   // function should be able to produce a fragment that won't parse back.
   if (isLinkablePhoto(view.photo)) parts.push(`p=${view.photo}`);

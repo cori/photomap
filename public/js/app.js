@@ -6,7 +6,7 @@ import { state, on, emit, emitNow, counts, dateRange, locatedPhotos, allFiltered
 import { loadSharedAlbum, loadFiles, loadImageUrls, parseAlbumInput, isImageUrl } from './sources.js';
 import { initMap, mapView, render, fitAll, focusPhoto, setBasemap, basemapNames, setRouteVisible, closeSpider } from './mapview.js';
 import { initLightbox, open as openLightbox, isOpen as lightboxOpen } from './lightbox.js';
-import { encodeView, decodeView, copyText, isLinkablePhoto } from './share.js';
+import { encodeView, decodeView, copyText, isLinkablePhoto, DEFAULT_BASEMAP } from './share.js';
 
 const SAMPLE = 'https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57';
 
@@ -284,11 +284,13 @@ async function restoreView(view) {
 }
 
 function applyView(view) {
-  if (view.basemap) {
-    setBasemap(view.basemap);
-    document.querySelectorAll('[data-basemap]').forEach((b) =>
-      b.classList.toggle('is-active', b.dataset.basemap === view.basemap));
-  }
+  // No b= means the sender was on the default, not "keep whatever I'm on":
+  // pasting a link mid-session used to leave the recipient's own basemap in
+  // place, showing them a different map from the one that was shared.
+  const basemap = view.basemap || DEFAULT_BASEMAP;
+  if (basemap !== mapView.basemap) setBasemap(basemap);
+  document.querySelectorAll('[data-basemap]').forEach((b) =>
+    b.classList.toggle('is-active', b.dataset.basemap === basemap));
 
   if (view.dates) {
     state.filters.from = view.dates.from;

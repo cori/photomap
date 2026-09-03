@@ -6,6 +6,7 @@
  */
 
 import { clusterPhotos, spiderPositions } from './cluster.js';
+import { DEFAULT_BASEMAP } from './share.js';
 import { locatedPhotos, state, on, emitNow } from './store.js';
 
 const L = window.L;
@@ -48,7 +49,7 @@ export const mapView = {
   spiderLayer: null,
   spiderOpen: null,
   basemapLayer: null,
-  basemap: 'light',
+  basemap: DEFAULT_BASEMAP,
   showRoute: true,
   renderHandle: null,
   // Once the viewer has chosen a view of their own, stop auto-fitting to
@@ -85,7 +86,7 @@ export function initMap(container) {
 }
 
 export function setBasemap(name) {
-  const spec = BASEMAPS[name] || BASEMAPS.dark;
+  const spec = BASEMAPS[name] || BASEMAPS[DEFAULT_BASEMAP];
   if (mapView.basemapLayer) mapView.map.removeLayer(mapView.basemapLayer);
   mapView.basemap = name;
   mapView.basemapLayer = L.tileLayer(spec.url, { ...spec.options, detectRetina: false }).addTo(mapView.map);
