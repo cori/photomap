@@ -6,6 +6,7 @@
  */
 
 import { clusterPhotos, spiderPositions } from './cluster.js';
+import { DEFAULT_BASEMAP } from './share.js';
 import { locatedPhotos, state, on, emitNow } from './store.js';
 
 const L = window.L;
@@ -48,7 +49,7 @@ export const mapView = {
   spiderLayer: null,
   spiderOpen: null,
   basemapLayer: null,
-  basemap: 'light',
+  basemap: DEFAULT_BASEMAP,
   showRoute: true,
   renderHandle: null,
   // Once the viewer has chosen a view of their own, stop auto-fitting to
@@ -85,12 +86,16 @@ export function initMap(container) {
 }
 
 export function setBasemap(name) {
-  const spec = BASEMAPS[name] || BASEMAPS.dark;
+  // Normalise before storing. A link can carry any b= value, and keeping an
+  // unknown one would leave the URL and the dark-mode CSS hook claiming a
+  // basemap that isn't the one on screen.
+  const key = BASEMAPS[name] ? name : DEFAULT_BASEMAP;
+  const spec = BASEMAPS[key];
   if (mapView.basemapLayer) mapView.map.removeLayer(mapView.basemapLayer);
-  mapView.basemap = name;
+  mapView.basemap = key;
   mapView.basemapLayer = L.tileLayer(spec.url, { ...spec.options, detectRetina: false }).addTo(mapView.map);
   mapView.basemapLayer.setZIndex(0);
-  document.body.dataset.basemap = name;
+  document.body.dataset.basemap = key;
 }
 
 export function basemapNames() {

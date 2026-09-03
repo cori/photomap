@@ -5,7 +5,7 @@
  */
 
 import { formatDms } from './exif.js';
-import { state, allFilteredPhotos, select } from './store.js';
+import { state, allFilteredPhotos, select, on } from './store.js';
 import { placeFor } from './sources.js';
 import { focusPhoto } from './mapview.js';
 
@@ -17,7 +17,7 @@ let index = -1;
 let insetMap = null;
 let insetMarker = null;
 
-export function initLightbox(root, { onShowOnMap } = {}) {
+export function initLightbox(root, { onShowOnMap, onShare } = {}) {
   root.innerHTML = `
     <div class="lb__backdrop" data-close></div>
     <div class="lb__panel" role="dialog" aria-modal="true" aria-label="Photo">
@@ -36,6 +36,7 @@ export function initLightbox(root, { onShowOnMap } = {}) {
         <div class="lb__inset"></div>
         <dl class="lb__facts"></dl>
         <div class="lb__actions">
+          <button class="btn btn--ghost" data-share>Copy link</button>
           <button class="btn btn--ghost" data-show-on-map>Show on map</button>
           <a class="btn btn--ghost" data-osm target="_blank" rel="noreferrer noopener">OpenStreetMap</a>
           <a class="btn btn--ghost" data-download target="_blank" rel="noreferrer noopener">Open original</a>
@@ -55,6 +56,12 @@ export function initLightbox(root, { onShowOnMap } = {}) {
   dom.osm = root.querySelector('[data-osm]');
   dom.download = root.querySelector('[data-download]');
   dom.showOnMap = root.querySelector('[data-show-on-map]');
+  dom.share = root.querySelector('[data-share]');
+
+  dom.share.addEventListener('click', () => {
+    const photo = current();
+    if (photo && onShare) onShare(photo);
+  });
 
   root.addEventListener('click', (e) => {
     if (e.target.closest('[data-close]')) close();
@@ -135,6 +142,7 @@ function show() {
   dom.position.textContent = `${index + 1} of ${navList.length}`;
   dom.download.href = photo.fullUrl;
 
+  renderedStatus = photo.status;
   renderFacts(photo);
   renderInset(photo);
   preload(index + 1);
@@ -225,6 +233,18 @@ function renderFacts(photo) {
     dom.showOnMap.hidden = true;
   }
 }
+
+// A deep link opens a photo the instant the album JSON lands, which is well
+// before its EXIF has been read. Refresh the panel when it catches up.
+let renderedStatus = null;
+on('photos', () => {
+  if (!isOpen()) return;
+  const photo = current();
+  if (!photo || photo.status === renderedStatus) return;
+  renderedStatus = photo.status;
+  renderFacts(photo);
+  renderInset(photo);
+});
 
 function renderInset(photo) {
   const gps = photo.exif?.gps;

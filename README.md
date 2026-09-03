@@ -28,7 +28,7 @@ https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57
 ```
 
 Published images are at `ghcr.io/cori/photomap` for `linux/amd64` and
-`linux/arm64`, tagged with the `package.json` version (`1.0.0`), the commit
+`linux/arm64`, tagged with the `package.json` version, the commit
 (`sha-<short>`), and `latest`. Pin the version tag — bump `package.json` to
 cut a new one.
 
@@ -67,8 +67,43 @@ Packaged in [cori/rtappstore](https://github.com/cori/rtappstore) as
 | Local photos | Drag them onto the window, or press **Files…**. Never leaves your machine. |
 | Direct image URLs | Paste any `https://…jpg` URLs. |
 
-Loaded albums are remembered, and the URL carries them (`#album=TOKEN,TOKEN`)
-so a mapped trip is a link you can bookmark.
+Loaded albums are remembered, and the URL carries the whole view, so a mapped
+trip is a link you can bookmark or send on — see below.
+
+## Sharing a view
+
+The address bar always describes what you're looking at, so copying it is a
+share. **Share** in the map controls copies the same link; **Copy link** in the
+photo viewer copies one that opens straight to that photo.
+
+```
+#album=TOKEN,TOKEN&c=53.34410,-6.26750&z=14&b=satellite&p=<photo guid>
+      &t=2024-05-19,2024-05-24&f=TOKEN
+```
+
+| Key | Meaning |
+| --- | --- |
+| `album` | Shared album tokens to load |
+| `c` | Map centre, `lat,lng` |
+| `z` | Zoom |
+| `b` | Basemap (omitted for the default) |
+| `p` | Photo to open, by its iCloud GUID |
+| `t` | Date filter, `from,to` — either side may be empty |
+| `f` | Which albums stay ticked, when not all of them |
+
+Everything but `album` is optional, so an older `#album=…`-only link still
+works and picks up a centre and zoom the moment you move the map. Opening a
+link to a photo shows the photo immediately and fills in its location a moment
+later, once its EXIF has been read.
+
+Two things worth knowing before you send one on:
+
+- **The link contains the album token**, which is the same secret as the
+  iCloud link itself — anyone with it can see the album. It lives in the URL
+  fragment, so it is never sent to the photomap server, but treat the link
+  exactly as you'd treat the iCloud one.
+- **Local files and pasted image URLs can't travel in a link** — there is
+  nothing for the other end to fetch. Only shared albums are shareable.
 
 ## What it does
 
@@ -125,6 +160,7 @@ public/js/cluster.js   greedy pixel-space clustering, spiderfy positions
 public/js/mapview.js   Leaflet map, photo pins, route, interaction
 public/js/lightbox.js  full-screen viewer, geodata panel, inset map
 public/js/store.js     state, filters, EXIF cache
+public/js/share.js     the shareable-link format, encode and decode
 public/js/app.js       side panel, filters, wiring
 ```
 
