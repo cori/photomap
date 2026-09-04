@@ -20,6 +20,7 @@ let fitScheduled = null;
 let restoring = false;
 let isMobile = false;
 let desktopSidebarOpen = true;
+let sidebarResizeTimer = 0;
 
 function boot() {
   cacheDom();
@@ -179,7 +180,8 @@ function wireDragAndDrop() {
 function setSidebarOpen(open) {
   document.body.classList.toggle('is-collapsed', !open);
   dom.sidebarBackdrop.hidden = !open || !isMobile;
-  setTimeout(() => mapView.map.invalidateSize(), 220);
+  clearTimeout(sidebarResizeTimer);
+  sidebarResizeTimer = setTimeout(() => mapView.map.invalidateSize(), 220);
 }
 
 function toggleSidebar() {
