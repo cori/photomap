@@ -19,6 +19,7 @@ let fitScheduled = null;
 // reading, so hold the writes until the restore finishes.
 let restoring = false;
 let isMobile = false;
+let desktopSidebarOpen = true;
 
 function boot() {
   cacheDom();
@@ -110,10 +111,16 @@ function wireEvents() {
   isMobile = mql.matches;
   if (isMobile) setSidebarOpen(false);
   mql.addEventListener('change', (e) => {
+    const wasMobile = isMobile;
     isMobile = e.matches;
-    // Entering mobile: collapse by default; entering desktop: show it.
-    if (isMobile) setSidebarOpen(false);
-    else setSidebarOpen(true);
+    if (isMobile) {
+      // Entering mobile: remember the desktop state and collapse.
+      desktopSidebarOpen = !document.body.classList.contains('is-collapsed');
+      setSidebarOpen(false);
+    } else if (wasMobile) {
+      // Returning to desktop: restore whatever the user had before.
+      setSidebarOpen(desktopSidebarOpen);
+    }
   });
 
   el('route-toggle').addEventListener('change', (e) => setRouteVisible(e.target.checked));
@@ -172,7 +179,7 @@ function wireDragAndDrop() {
 function setSidebarOpen(open) {
   document.body.classList.toggle('is-collapsed', !open);
   dom.sidebarBackdrop.hidden = !open || !isMobile;
-  setTimeout(() => mapView.map.invalidateSize(), 240);
+  setTimeout(() => mapView.map.invalidateSize(), 220);
 }
 
 function toggleSidebar() {
