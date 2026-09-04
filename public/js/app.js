@@ -291,8 +291,20 @@ async function share(photo) {
     : 'Link copied — it opens this exact view.');
 }
 
+/**
+ * A "hotlink" is a shared URL that carries specific framing — a map position,
+ * a photo to open, or a date filter. The recipient wants to see the shared
+ * view, not the sidebar, so we collapse it automatically. A plain
+ * `#album=TOKEN` with no framing is just "load this album", not a deep link,
+ * so the sidebar stays as-is.
+ */
+function isHotlink(view) {
+  return !!(view.center || view.photo || view.dates);
+}
+
 async function restoreFromUrl() {
   const view = decodeView(location.hash);
+  if (isHotlink(view)) setSidebarOpen(false);
   restoring = true;
   try {
     await restoreView(view);
