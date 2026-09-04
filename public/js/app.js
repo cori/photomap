@@ -108,7 +108,7 @@ function wireEvents() {
   // Track mobile breakpoint so we can auto-collapse.
   const mql = window.matchMedia(MOBILE_MQ);
   isMobile = mql.matches;
-  if (isMobile) document.body.classList.add('is-collapsed');
+  if (isMobile) setSidebarOpen(false);
   mql.addEventListener('change', (e) => {
     isMobile = e.matches;
     // Entering mobile: collapse by default; entering desktop: show it.
