@@ -401,6 +401,27 @@ body[data-basemap="dark"] .map .leaflet-tile-pane,
   clip-path: polygon(50% 100%, 14% 0%, 86% 0%);
 }
 
+/* ----------------------------------------------------- sidebar header -- */
+
+/* On desktop, the sidebar header is hidden — Panel button in map controls
+   handles it; the close button is only useful when the sidebar overlays. */
+.sidebar__head { display: none; }
+
+/* Hamburger in the topbar, hidden on desktop. */
+.topbar__menu {
+  display: none;
+  border: none; background: none; color: var(--text); cursor: pointer;
+  padding: 6px; margin: -6px 0 -6px -4px; flex: none;
+  border-radius: 6px;
+}
+.topbar__menu:hover { background: var(--accent-soft); }
+
+/* Backdrop behind overlay sidebar on mobile, hidden on desktop. */
+.sidebar-backdrop {
+  position: absolute; inset: 0; z-index: 1050;
+  background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px);
+}
+
 /* ----------------------------------------------------------- responsive -- */
 
 @media (max-width: 900px) {
@@ -412,9 +433,82 @@ body[data-basemap="dark"] .map .leaflet-tile-pane,
 }
 
 @media (max-width: 760px) {
-  .topbar { flex-wrap: wrap; height: auto; padding: 10px; gap: 10px; }
+  /* ---- topbar ---- */
+  .topbar {
+    flex-wrap: wrap; height: auto;
+    padding: 10px; padding-top: max(10px, env(safe-area-inset-top));
+    gap: 8px;
+  }
+  .topbar__menu { display: grid; place-items: center; }
+  .brand h1 { font-size: 14px; }
   .loader { order: 3; width: 100%; max-width: none; flex-basis: 100%; }
-  .sidebar { position: absolute; z-index: 1100; top: 0; bottom: 0; box-shadow: var(--shadow); }
-  .main { position: relative; }
-  .status { max-width: 150px; }
+  .loader__input { height: 38px; font-size: 14px; }   /* taller touch target */
+  .loader__input::placeholder { font-size: 12px; }
+  .status { max-width: 120px; font-size: 11px; }
+  .topbar__right { gap: 6px; }
+
+  /* ---- sidebar as slide-out overlay ---- */
+  .main { position: relative; overflow: hidden; }
+  .sidebar {
+    position: absolute; z-index: 1100;
+    top: 0; bottom: 0; left: 0;
+    width: min(var(--sidebar-w), 85vw);
+    box-shadow: var(--shadow);
+    transform: translateX(0);
+    transition: transform 0.22s ease;
+  }
+  body.is-collapsed .sidebar {
+    display: flex;    /* override desktop display:none — we animate instead */
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+
+  .sidebar__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--line);
+    flex: none;
+  }
+  .sidebar__title { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .sidebar__close {
+    width: 32px; height: 32px; border: none; border-radius: 8px;
+    background: var(--bg-sunken); color: var(--text); font-size: 20px;
+    cursor: pointer; display: grid; place-items: center;
+  }
+  .sidebar__close:hover { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---- map controls ---- */
+  .map-controls { top: 8px; right: 8px; gap: 6px; }
+  /* Hide the desktop "Panel" toggle — we use the hamburger + close instead. */
+  #sidebar-toggle { display: none; }
+  .btn { height: 38px; padding: 0 10px; font-size: 12px; }
+  .segmented button { height: 36px; padding: 0 9px; font-size: 12px; }
+  .toggle { height: 38px; font-size: 12px; }
+
+  /* ---- lightbox ---- */
+  .lb__close { width: 38px; height: 38px; top: max(12px, env(safe-area-inset-top)); left: 12px; }
+  .lb__nav { width: 44px; height: 44px; }
+  .lb__nav--prev { left: 8px; }
+  .lb__nav--next { right: 8px; }
+  .lb__stage { padding: 10px; }
+  .lb__img { max-height: 48vh; }
+  .lb__meta { padding: 16px 14px; }
+  .lb__fact { grid-template-columns: 74px minmax(0, 1fr); gap: 6px; }
+
+  /* ---- thumbnails ---- */
+  .thumbgrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px; }
+
+  /* ---- range slider ---- */
+  .range input::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8.5px; }
+  .range input::-moz-range-thumb { width: 20px; height: 20px; }
+
+  /* ---- safe areas ---- */
+  .map-controls { right: max(8px, env(safe-area-inset-right)); }
+  .hint { bottom: max(20px, env(safe-area-inset-bottom)); }
+}
+
+/* Extra-narrow: stack even further */
+@media (max-width: 400px) {
+  .brand h1 { display: none; }
+  .loader__input::placeholder { font-size: 11px; }
+  .map-controls { flex-direction: column; align-items: flex-end; }
 }
