@@ -9,6 +9,7 @@ import { initLightbox, open as openLightbox, isOpen as lightboxOpen } from './li
 import { encodeView, decodeView, copyText, isLinkablePhoto, DEFAULT_BASEMAP } from './share.js';
 
 const SAMPLE = 'https://www.icloud.com/sharedalbum/#B0n5Uzl7V3IW57';
+const MOBILE_MQ = '(max-width: 760px)';
 
 const el = (id) => document.getElementById(id);
 const dom = {};
@@ -17,6 +18,7 @@ let fitScheduled = null;
 // Writing the URL from that half-built state would erase the very link we're
 // reading, so hold the writes until the restore finishes.
 let restoring = false;
+let isMobile = false;
 
 function boot() {
   cacheDom();
@@ -31,7 +33,10 @@ function boot() {
   on('photos', () => { renderAlbums(); renderStats(); renderTimeRange(); renderUnlocated(); maybeFit(); });
   on('progress', renderStats);
   on('viewport', renderInView);
-  on('open', (id) => openLightbox(id));
+  on('open', (id) => {
+    if (isMobile) setSidebarOpen(false);
+    openLightbox(id);
+  });
   on('filters', () => { renderStats(); renderUnlocated(); });
 
   restoreFromUrl();
@@ -60,6 +65,7 @@ function cacheDom() {
   dom.dropzone = el('dropzone');
   dom.hint = el('hint');
   dom.share = el('share');
+  dom.sidebarBackdrop = el('sidebar-backdrop');
 }
 
 // ---------------------------------------------------------------------------
@@ -77,9 +83,37 @@ function wireEvents() {
 
   el('try-sample').addEventListener('click', () => addFromText(SAMPLE));
   el('fit-all').addEventListener('click', () => { mapView.userInteracted = true; fitAll(); });
+
+  // --- Sidebar open / close ---
   el('sidebar-toggle').addEventListener('click', () => {
-    document.body.classList.toggle('is-collapsed');
-    setTimeout(() => mapView.map.invalidateSize(), 220);
+    toggleSidebar();
+  });
+  el('sidebar-open').addEventListener('click', () => {
+    setSidebarOpen(true);
+  });
+  el('sidebar-close').addEventListener('click', () => {
+    setSidebarOpen(false);
+  });
+  dom.sidebarBackdrop.addEventListener('click', () => {
+    setSidebarOpen(false);
+  });
+
+  // On mobile, close the sidebar when the user starts interacting with the map.
+  mapView.map.on('movestart', () => {
+    if (isMobile && !document.body.classList.contains('is-collapsed')) {
+      setSidebarOpen(false);
+    }
+  });
+
+  // Track mobile breakpoint so we can auto-collapse.
+  const mql = window.matchMedia(MOBILE_MQ);
+  isMobile = mql.matches;
+  if (isMobile) setSidebarOpen(false);
+  mql.addEventListener('change', (e) => {
+    isMobile = e.matches;
+    // Entering mobile: collapse by default; entering desktop: show it.
+    if (isMobile) setSidebarOpen(false);
+    else setSidebarOpen(true);
   });
 
   el('route-toggle').addEventListener('change', (e) => setRouteVisible(e.target.checked));
@@ -133,6 +167,16 @@ function wireDragAndDrop() {
     dom.dropzone.hidden = true;
     if (e.dataTransfer.files?.length) ingestFiles(e.dataTransfer.files);
   });
+}
+
+function setSidebarOpen(open) {
+  document.body.classList.toggle('is-collapsed', !open);
+  dom.sidebarBackdrop.hidden = !open || !isMobile;
+  setTimeout(() => mapView.map.invalidateSize(), 240);
+}
+
+function toggleSidebar() {
+  setSidebarOpen(document.body.classList.contains('is-collapsed'));
 }
 
 async function addFromText(text) {
@@ -247,8 +291,20 @@ async function share(photo) {
     : 'Link copied — it opens this exact view.');
 }
 
+/**
+ * A "hotlink" is a shared URL that carries specific framing — a map position,
+ * a photo to open, or a date filter. The recipient wants to see the shared
+ * view, not the sidebar, so we collapse it automatically. A plain
+ * `#album=TOKEN` with no framing is just "load this album", not a deep link,
+ * so the sidebar stays as-is.
+ */
+function isHotlink(view) {
+  return !!(view.center || view.photo || view.dates);
+}
+
 async function restoreFromUrl() {
   const view = decodeView(location.hash);
+  if (isHotlink(view)) setSidebarOpen(false);
   restoring = true;
   try {
     await restoreView(view);
