@@ -1,6 +1,6 @@
 {
   "name": "photomap",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Plot iCloud shared album photos on a map by reading their EXIF GPS data",
   "main": "server.js",
   "scripts": {
